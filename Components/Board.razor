@@ -1,0 +1,139 @@
+@inject GameState State
+
+@if (!State.AreColorsSelected)
+{
+    <div class="color-selection">
+        <h2>Select Your Colors</h2>
+        
+        @if (string.IsNullOrEmpty(player1SelectedColor))
+        {
+            <div class="player-selection">
+                <h3>Player 1: Choose Your Color</h3>
+                <div class="color-palette">
+                    @foreach (var color in GameState.AvailableColors)
+                    {
+                        <button class="color-button" 
+                                style="background-color: @color;" 
+                                @onclick="() => SelectColorForPlayer(1, color)"
+                                title="Select this color">
+                        </button>
+                    }
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="player-selection">
+                <h3>Player 2: Choose Your Color</h3>
+                <p style="color: @player1SelectedColor;">Player 1 selected: <span style="display: inline-block; width: 20px; height: 20px; background-color: @player1SelectedColor;"></span></p>
+                <div class="color-palette">
+                    @foreach (var color in GameState.AvailableColors)
+                    {
+                        var isDisabled = color == player1SelectedColor;
+                        <button class="color-button" 
+                                style="background-color: @color; @(isDisabled ? "opacity: 0.5; cursor: not-allowed;" : "")"
+                                @onclick="() => SelectColorForPlayer(2, color)"
+                                disabled="@isDisabled"
+                                title="@(isDisabled ? "Color already taken" : "Select this color")">
+                        </button>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+}
+else
+{
+    
+<nav>
+    @for (byte i = 0; i < 7; i++)
+    {
+        var col = i;
+        <span title="Click to play a piece" @onclick="() => PlayPiece(col)">🔽</span>
+    }
+</nav>
+
+<article>
+    @winnerMessage  <button style="@ResetStyle" @onclick="ResetGame">Reset the game</button>
+    <br />
+    <span class="alert-danger">@errorMessage</span>
+    <span class="alert-info">@CurrentTurn</span>
+</article>
+
+<div style="--player1: @State.GetPlayerColor(1); --player2: @State.GetPlayerColor(2); --board-bg: yellow;">
+    <div class="board">
+
+    @for (var i = 0; i < 42; i++)
+    {
+        <span class="container">
+            <span></span>
+        </span>
+    }
+    </div>
+
+    @for (var i = 0; i < 42; i++)
+    {
+       <span class="@pieces[i]"></span>
+    }
+</div>
+}
+
+@code {
+    private string[] pieces = new string[42];
+    private string winnerMessage = string.Empty;
+    private string errorMessage = string.Empty;
+    private string? player1SelectedColor;
+    
+    private string CurrentTurn => (winnerMessage == string.Empty) ? $"Player {State.PlayerTurn}'s Turn" : "";
+    private string ResetStyle => (winnerMessage == string.Empty) ? "display: none;" : "";
+
+    private void SelectColorForPlayer(int player, string color)
+    {
+        if (State.SetPlayerColor(player, color))
+        {
+            if (player == 1)
+            {
+                player1SelectedColor = color;
+            }
+        }
+    }
+
+    private void PlayPiece(byte col)
+    {
+        errorMessage = string.Empty;
+        try
+        {
+            var player = State.PlayerTurn;
+            var turn = State.CurrentTurn;
+            var landingRow = State.PlayPiece(col);
+            pieces[turn] = $"player{player} col{col} drop{landingRow}";
+        }
+        catch (ArgumentException ex)
+        {
+            errorMessage = ex.Message;
+        }    
+
+        winnerMessage = State.CheckForWin() switch
+        {
+            GameState.WinState.Player1_Wins => "Player 1 Wins!",
+            GameState.WinState.Player2_Wins => "Player 2 Wins!",
+            GameState.WinState.Tie => "It's a tie!",
+            _ => ""
+        };
+    }
+
+    protected override void OnInitialized()
+    {
+        State.ResetBoard();
+    }
+
+    void ResetGame()
+    {
+        State.ResetBoard();
+        State.ResetColors();
+        player1SelectedColor = null;
+        winnerMessage = string.Empty;
+        errorMessage = string.Empty;
+        pieces = new string[42];
+    }
+}
